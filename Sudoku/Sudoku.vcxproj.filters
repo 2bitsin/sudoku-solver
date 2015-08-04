@@ -21,6 +21,9 @@
     <Text Include="..\Data\subig20.txt">
       <Filter>Data</Filter>
     </Text>
+    <Text Include="..\Data\top2365.txt">
+      <Filter>Data</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">
