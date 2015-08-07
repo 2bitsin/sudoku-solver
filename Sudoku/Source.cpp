@@ -249,7 +249,7 @@ bool solve (const sudoku_grid& grid, sudoku_grid& gout, std::uint32_t next = 0u)
     auto i = next;
     while (i < 81u && grid.cell (i).is_set ()) ++i;
     if (i >= 81u) {
-        gout = grid;
+        gout = grid;//
         return true;
     }
     auto& _cell = grid.cell (i);
