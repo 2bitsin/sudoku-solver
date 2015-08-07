@@ -5,10 +5,7 @@
 #include <string>
 #include <array>
 #include <vector>
-#include <memory>
 #include <chrono>
-#include <queue>
-#include <stack>
 
 auto pre_load (std::istream& is, std::size_t n = 0u) {
     static const auto bad_format =
@@ -131,8 +128,8 @@ struct sudoku_grid {
         }
      
     private:
-        std::uint8_t _value;
         std::uint16_t _mask;
+        std::uint8_t _value;        
     };
     
     static inline auto map (std::uint32_t i, std::uint32_t j) {
@@ -156,7 +153,6 @@ struct sudoku_grid {
     auto&& cell (std::uint32_t i, std::uint32_t j) const    { return grid [map (i, j)]; }
     auto is_good () const { return _is_good; }
     auto good (bool b) { _is_good = b; }
-
 
     auto is_valid () const {
         for (auto i = 0u; i < 9u; ++i) {
@@ -270,7 +266,7 @@ bool solve (const sudoku_grid& grid, sudoku_grid& gout, std::uint32_t next = 0u)
 int main () try {
     //#define TEST
     #ifndef TEST
-    auto puzzles = pre_load (std::cin, 500);
+    auto puzzles = pre_load (std::cin);
     auto out = sudoku_grid ();
     auto t0 = std::chrono::high_resolution_clock::now ();
     for (const auto& in: puzzles) {
