@@ -66,7 +66,7 @@ struct sudoku_grid {
         static const auto INVALID_ALL = std::uint16_t (0x1ff);
 
         cell_type ()
-            :_value (0u) 
+            :_value (0u), _mask (0u)
         {}
 
         cell_type (std::uint8_t v)
@@ -82,7 +82,7 @@ struct sudoku_grid {
         }
 
         auto value () const { 
-            return _value; 
+            return std::uint8_t (_value); 
         }
 
         auto invalid (std::uint16_t v) { 
@@ -103,8 +103,9 @@ struct sudoku_grid {
         }
 
         auto& invalidate (std::uint8_t v) { 
-            if (v >= 1 && v <= 9) 
-                _mask |= (1 << (v - 1u)); 
+            if (v < 1 || v > 9)
+                return *this;
+            _mask |= (1 << (v - 1u)); 
             return *this; 
         }
 
@@ -116,11 +117,10 @@ struct sudoku_grid {
         auto is_valid (std::uint8_t v) const { 
             if (v < 1 || v > 9)
                 return false;
-            if (is_set () && value () == v)
-                return true;
-            if (_mask & (1 << (v - 1u)))
-                return true;
-            return false;
+            if (is_set ())
+                return value () == v;
+            auto j = _mask & (1u << (v - 1u));
+            return !(j);
         }
 
         cell_type& operator = (const cell_type&) = default;
@@ -183,15 +183,15 @@ protected:
             for (auto j = 0u; j < 9u; ++j) {
                 row [i].invalidate (cell (i*9u + j).value ());
                 col [i].invalidate (cell (j*9u + i).value ());
-                blk [i].invalidate (cell (map (i, j)).value ());
+                blk [i].invalidate (cell (i, j).value ());
             }
         }
 
         for (auto i = 0u; i < 9u; ++i) {
             for (auto j = 0u; j < 9u; ++j) {
-                auto& rcell = cell (j, i);
-                rcell.invalidate_set (row [j].invalid ());
-                rcell.invalidate_set (col [i].invalid ());
+                auto& rcell = cell (i*9u + j);
+                rcell.invalidate_set (row [i].invalid ());
+                rcell.invalidate_set (col [j].invalid ());               
                 rcell.invalidate_set (blk [i - i%3u + j/3u].invalid ());
             }
         }
@@ -253,7 +253,7 @@ bool solve (const sudoku_grid& grid, sudoku_grid& gout, std::uint32_t next = 0u)
         return true;
     }
     auto& _cell = grid.cell (i);
-    for (auto j = 0u; j < 9; ++j) {
+    for (auto j = 1u; j <= 9; ++j) {
         if (!_cell.is_valid (j))
             continue;
         auto new_grid = grid.mutate (i, j);
@@ -266,19 +266,25 @@ bool solve (const sudoku_grid& grid, sudoku_grid& gout, std::uint32_t next = 0u)
 }
 
 
+
 int main () try {
-    auto puzzles = pre_load (std::cin, 50);
+    //#define TEST
+    #ifndef TEST
+    auto puzzles = pre_load (std::cin, 500);
     auto out = sudoku_grid ();
+    auto t0 = std::chrono::high_resolution_clock::now ();
     for (const auto& in: puzzles) {
-        print (in);
-        std::cout << "\n";
-        if (!solve (in, out)) {
-            std::cout << "Solution not found!\n";
-            continue;
-        }
-        print (out);
-        std::cout << "\n";
+        if (!solve (in, out) || !out.is_valid ()) {
+            throw std::runtime_error ("Solution not found");
+        }        
     }
+    auto t1 = std::chrono::high_resolution_clock::now ();
+    auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count () / 1000.0;
+    std::cout << t << "s\n";
+    #else
+    void run_tests ();
+    run_tests ();
+    #endif
 
     return 0;
 }
@@ -286,3 +292,144 @@ catch (const std::exception& e) {
     std::cout << e.what () << "\n";
     return -1;    
 }
+
+void test_cell () {
+    sudoku_grid::cell_type ct;
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == true);
+    assert (ct.is_valid (6u) == true);
+    assert (ct.is_valid (7u) == true);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == true);
+    ct = 9;
+    assert (ct.value () == 9u);
+    assert (ct.is_set () == true);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == false);
+    assert (ct.is_valid (2u) == false);
+    assert (ct.is_valid (3u) == false);
+    assert (ct.is_valid (4u) == false);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == false);
+    assert (ct.is_valid (9u) == true);
+    ct.value (8);
+    assert (ct.value () == 8u);
+    assert (ct.is_set () == true);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == false);
+    assert (ct.is_valid (2u) == false);
+    assert (ct.is_valid (3u) == false);
+    assert (ct.is_valid (4u) == false);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == false);
+    ct.value (0);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == true);
+    assert (ct.is_valid (6u) == true);
+    assert (ct.is_valid (7u) == true);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == true);
+    ct.invalidate (5u);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == true);
+    assert (ct.is_valid (7u) == true);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == true);
+    ct.invalidate (6u);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == true);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == true);
+    ct.invalidate (7u);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == true);
+    assert (ct.is_valid (9u) == true);
+    ct.invalidate (8u);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == true);
+    assert (ct.is_valid (2u) == true);
+    assert (ct.is_valid (3u) == true);
+    assert (ct.is_valid (4u) == true);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == false);
+    assert (ct.is_valid (9u) == true);
+    assert (ct.invalid () == 0x0f0);
+    ct.invalidate_set (ct.invalid () | 0xf);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == false);
+    assert (ct.is_valid (1u) == false);
+    assert (ct.is_valid (2u) == false);
+    assert (ct.is_valid (3u) == false);
+    assert (ct.is_valid (4u) == false);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == false);
+    assert (ct.is_valid (9u) == true);
+    assert (ct.invalid () == 0x0ff);
+    ct.invalidate (9u);
+    assert (ct.value () == 0u);
+    assert (ct.is_set () == false);
+    assert (ct.empty () == true);
+    assert (ct.is_valid (1u) == false);
+    assert (ct.is_valid (2u) == false);
+    assert (ct.is_valid (3u) == false);
+    assert (ct.is_valid (4u) == false);
+    assert (ct.is_valid (5u) == false);
+    assert (ct.is_valid (6u) == false);
+    assert (ct.is_valid (7u) == false);
+    assert (ct.is_valid (8u) == false);
+    assert (ct.is_valid (9u) == false);
+    assert (ct.invalid () == ct.INVALID_ALL);
+}
+
+void run_tests () {
+    test_cell ();
+}
+
